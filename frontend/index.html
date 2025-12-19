@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura | Proactive Student Success</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js for dashboard visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Three.js for 3D background -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js"
+            }
+        }
+    </script>
+    <!-- Custom Styles -->
+    <style>
+        :root {
+            --bg-color: #020617; /* slate-950 */
+            --card-bg: rgba(15, 23, 42, 0.6); /* slate-900 with opacity */
+            --border-color: rgba(51, 65, 85, 0.4); /* slate-700 with opacity */
+            --text-primary: #f8fafc; /* slate-50 */
+            --text-secondary: #94a3b8; /* slate-400 */
+            --accent-blue: #38bdf8; /* sky-400 */
+            --accent-violet: #818cf8; /* indigo-400 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            overflow: hidden; /* Prevent scrollbars during page transitions */
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .main-wrapper {
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            perspective: 1000px;
+        }
+
+        .main-container {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-color);
+            border-radius: 1.5rem; /* rounded-3xl */
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            transform-style: preserve-3d;
+        }
+
+        .glass-card:hover {
+             transform: scale(1.02);
+        }
+
+        .card-glow {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 1.5rem;
+            background: radial-gradient(1000px circle at var(--mouse-x) var(--mouse-y), rgba(56, 189, 248, 0.1), transparent 40%);
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .glass-card:hover .card-glow {
+            opacity: 1;
+        }
+        
+        .content-wrapper {
+            transform: translateZ(40px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-violet));
+            color: white;
+            font-weight: 600;
+            padding: 0.8rem 1.75rem;
+            border-radius: 9999px; /* rounded-full */
+            transition: all 0.3s ease;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.3), 0 0 25px rgba(129, 140, 248, 0.2);
+            border: 1px solid var(--accent-blue);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 0 40px rgba(56, 189, 248, 0.5), 0 0 40px rgba(129, 140, 248, 0.3);
+        }
+
+        .nav-link {
+            transition: color 0.3s ease, background-color 0.3s ease;
+        }
+        .nav-link.active {
+            color: white;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Dynamic Page Transitions */
+        .page {
+            position: absolute;
+            width: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateZ(-100px) scale(0.95);
+            transition: opacity 0.4s ease-in, transform 0.4s cubic-bezier(0.6, -0.28, 0.74, 0.05);
+        }
+        .page.active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateZ(0) scale(1);
+            transition: opacity 0.6s ease-out 0.4s, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.4s;
+        }
+        
+        main { position: relative; }
+
+
+        .form-input {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem; /* rounded-xl */
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            padding: 0.8rem 1rem;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+            background: rgba(0,0,0,0.3);
+        }
+        
+        .loader { width: 50px; height: 50px; border-radius: 50%; position: relative; animation: rotate 1s linear infinite }
+        .loader::before, .loader::after { content: ""; box-sizing: border-box; position: absolute; inset: 0px; border-radius: 50%; border: 5px solid #FFF; animation: prixClipFix 2s linear infinite; }
+        .loader::after { border-color: var(--accent-blue); animation: prixClipFix 2s linear infinite, rotate 0.5s linear infinite reverse; inset: 6px; }
+        @keyframes rotate { 0% { transform: rotate(0deg) } 100% { transform: rotate(360deg) } }
+        @keyframes prixClipFix { 0% { clip-path: polygon(50% 50%,0 0,0 0,0 0,0 0,0 0) } 25% { clip-path: polygon(50% 50%,0 0,100% 0,100% 0,100% 0,100% 0) } 50% { clip-path: polygon(50% 50%,0 0,100% 0,100% 100%,100% 100%,100% 100%) } 75% { clip-path: polygon(50% 50%,0 0,100% 0,100% 100%,0 100%,0 100%) } 100% { clip-path: polygon(50% 50%,0 0,100% 0,100% 100%,0 100%,0 0) } }
+
+        /* Preloader Styles */
+        #preloader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        #preloader.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        #preloader .logo-loader {
+            width: 100px;
+            height: 100px;
+            animation: pulse-logo 1.5s infinite ease-in-out;
+            color: var(--accent-blue);
+        }
+        @keyframes pulse-logo {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
+
+        .home-scrim {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(2, 6, 23, 0.7) 0%, rgba(2, 6, 23, 0) 70%);
+            z-index: 0;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="preloader">
+        <svg class="logo-loader" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.5 21.75l-.398-1.197a3.375 3.375 0 00-2.456-2.456L12.75 18l1.197-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.197a3.375 3.375 0 002.456 2.456L20.25 18l-1.197.398a3.375 3.375 0 00-2.456 2.456z" />
+        </svg>
+    </div>
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="main-wrapper">
+        <div id="auth-container">
+            <main class="flex-grow">
+                <section id="login" class="page active">
+                     <div class="flex items-center justify-center" style="min-height: 100vh;">
+                        <div class="glass-card w-full max-w-md p-8 lg:p-10">
+                            <div class="card-glow"></div>
+                            <div class="content-wrapper">
+                                <!-- Login Form -->
+                                <div id="login-form-container">
+                                    <div class="flex justify-center mb-6">
+                                        <svg class="h-12 w-12 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.5 21.75l-.398-1.197a3.375 3.375 0 00-2.456-2.456L12.75 18l1.197-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.197a3.375 3.375 0 002.456 2.456L20.25 18l-1.197.398a3.375 3.375 0 00-2.456 2.456z" /></svg>
+                                    </div>
+                                    <h2 class="text-3xl font-bold text-white mb-2 text-center">Welcome Back</h2>
+                                    <p class="mb-8 text-slate-400 text-center">Login to access Aura Predict.</p>
+                                    <form id="loginForm" class="space-y-6">
+                                        <div><label for="login_email" class="block text-sm font-medium text-slate-300">Email Address</label><input type="email" id="login_email" required class="mt-1 block w-full form-input" placeholder="you@example.com"></div>
+                                        <div><label for="login_password" class="block text-sm font-medium text-slate-300">Password</label><input type="password" id="login_password" required class="mt-1 block w-full form-input" placeholder="••••••••"></div>
+                                        <div class="pt-4"><button type="submit" class="btn-primary w-full text-lg">Login</button></div>
+                                    </form>
+                                    <p class="mt-6 text-center text-sm text-slate-400">Don't have an account? <a href="#" id="show-register" class="font-medium text-sky-400 hover:underline">Register here</a></p>
+                                </div>
+                                <!-- Register Form (hidden by default) -->
+                                <div id="register-form-container" class="hidden">
+                                    <div class="flex justify-center mb-6"><svg class="h-12 w-12 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.5 21.75l-.398-1.197a3.375 3.375 0 00-2.456-2.456L12.75 18l1.197-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.197a3.375 3.375 0 002.456 2.456L20.25 18l-1.197.398a3.375 3.375 0 00-2.456 2.456z" /></svg></div>
+                                    <h2 class="text-3xl font-bold text-white mb-2 text-center">Create Account</h2>
+                                    <p class="mb-8 text-slate-400 text-center">Get started with Aura Predict today.</p>
+                                    <form id="registerForm" class="space-y-6">
+                                        <div><label for="register_name" class="block text-sm font-medium text-slate-300">Full Name</label><input type="text" id="register_name" required class="mt-1 block w-full form-input" placeholder="Your Name"></div>
+                                        <div><label for="register_email" class="block text-sm font-medium text-slate-300">Email Address</label><input type="email" id="register_email" required class="mt-1 block w-full form-input" placeholder="you@example.com"></div>
+                                        <div><label for="register_password" class="block text-sm font-medium text-slate-300">Password</label><input type="password" id="register_password" required class="mt-1 block w-full form-input" placeholder="••••••••"></div>
+                                        <div class="pt-4"><button type="submit" class="btn-primary w-full text-lg">Create Account</button></div>
+                                    </form>
+                                    <p class="mt-6 text-center text-sm text-slate-400">Already have an account? <a href="#" id="show-login" class="font-medium text-sky-400 hover:underline">Login here</a></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <div id="app-content" class="hidden min-h-screen flex-col main-container">
+            <!-- Header & Navigation -->
+            <header class="sticky top-0 z-50">
+                <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between items-center py-4 my-4 glass-card px-6">
+                        <div class="card-glow"></div>
+                        <div class="content-wrapper flex justify-between items-center w-full">
+                            <div class="flex items-center space-x-3">
+                                <svg class="h-8 w-8 text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.553L16.5 21.75l-.398-1.197a3.375 3.375 0 00-2.456-2.456L12.75 18l1.197-.398a3.375 3.375 0 002.456-2.456L16.5 14.25l.398 1.197a3.375 3.375 0 002.456 2.456L20.25 18l-1.197.398a3.375 3.375 0 00-2.456 2.456z" />
+                                </svg>
+                                <span class="text-xl font-bold text-white">Aura Predict</span>
+                            </div>
+                            <div class="hidden md:flex items-center space-x-2">
+                                <a href="#home" class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10 active">Home</a>
+                                <a href="#predictor" class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10">Predictor</a>
+                                <a href="#batch" class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10">Batch</a>
+                                <a href="#dashboard" class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10">Dashboard</a>
+                                <a href="#about" class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10">About</a>
+                                <button id="logout-btn" class="nav-link px-4 py-2 rounded-lg text-sm font-medium text-slate-300 hover:bg-white/10">Logout</button>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            </header>
+
+            <!-- Main Content Area -->
+            <main class="flex-grow">
+                 <!-- Home Page -->
+                <section id="home" class="page active">
+                    <div class="relative flex items-center justify-center text-center" style="min-height: calc(100vh - 120px);">
+                        <div class="home-scrim"></div>
+                         <div class="relative max-w-3xl px-4 z-10">
+                            <h1 class="text-5xl font-extrabold tracking-tight text-white sm:text-7xl">
+                                <span class="block">Predictive Insight for</span>
+                                <span class="block bg-clip-text text-transparent bg-gradient-to-r from-sky-400 to-indigo-400 py-2">Proactive Education</span>
+                            </h1>
+                            <p class="mt-6 text-lg text-slate-300 sm:text-xl">
+                                Aura leverages state-of-the-art ensemble machine learning to transform educational data into clear, actionable intelligence, empowering institutions to foster student success.
+                            </p>
+                            <div class="mt-10">
+                                <a href="#predictor" class="nav-link inline-block btn-primary text-lg">
+                                    Begin Analysis
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Predictor Page -->
+                <section id="predictor" class="page">
+                    <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                            <div class="glass-card p-8 lg:p-10"><div class="card-glow"></div><div class="content-wrapper">
+                                <h2 class="text-3xl font-bold text-white mb-2">Student Metrics Input</h2>
+                                <p class="mb-8 text-slate-400">Enter student data to generate a predictive risk profile.</p>
+                                <form id="predictionForm" class="grid grid-cols-1 md:grid-cols-2 gap-6 text-white">
+                                    <div><label for="prev_gpa" class="block text-sm font-medium text-slate-300">Previous GPA (out of 10)</label><input type="number" id="prev_gpa" name="prev_gpa" step="0.1" min="0" max="10" required class="mt-1 block w-full form-input" placeholder="e.g., 7.5"></div>
+                                    <div><label for="attendance" class="block text-sm font-medium text-slate-300">Attendance (%)</label><input type="number" id="attendance" name="attendance" min="0" max="100" required class="mt-1 block w-full form-input" placeholder="e.g., 85"></div>
+                                    <div><label for="backlogs" class="block text-sm font-medium text-slate-300">Current Backlogs</label><input type="number" id="backlogs" name="backlogs" min="0" required class="mt-1 block w-full form-input" placeholder="e.g., 2"></div>
+                                    <div><label for="mid_term" class="block text-sm font-medium text-slate-300">Mid-Term Score (%)</label><input type="number" id="mid_term" name="mid_term" min="0" max="100" required class="mt-1 block w-full form-input" placeholder="e.g., 65"></div>
+                                    <div class="md:col-span-2"><label for="engagement" class="block text-sm font-medium text-slate-300">Platform Engagement (hours/week)</label><input type="number" id="engagement" name="engagement" min="0" required class="mt-1 block w-full form-input" placeholder="e.g., 5"></div>
+                                    <div><label for="scholarship" class="block text-sm font-medium text-slate-300">Scholarship Holder</label><select id="scholarship" name="scholarship" class="mt-1 block w-full form-input"><option value="0">No</option><option value="1">Yes</option></select></div>
+                                    <div><label for="activities" class="block text-sm font-medium text-slate-300">Co-curriculars</label><select id="activities" name="activities" class="mt-1 block w-full form-input"><option value="0">Low</option><option value="1">Medium</option><option value="2">High</option></select></div>
+                                    <div class="md:col-span-2 mt-6 text-center"><button type="submit" class="btn-primary w-full md:w-auto text-lg">Generate Risk Profile</button></div>
+                                </form>
+                            </div></div>
+                            <div class="glass-card p-8 lg:p-10 sticky top-28"><div class="card-glow"></div><div class="content-wrapper">
+                                <h2 class="text-2xl font-bold text-white mb-6 text-center">Risk Analysis Result</h2>
+                                <div id="resultPlaceholder" class="text-center text-slate-500 py-10"><svg class="mx-auto h-16 w-16" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25A2.25 2.25 0 015.25 3h13.5A2.25 2.25 0 0121 5.25z" /></svg><p class="mt-4">Results will appear here upon analysis.</p></div>
+                                <div id="resultOutput" class="hidden"><div class="flex flex-col items-center"><div id="result-ring" class="relative w-48 h-48 flex items-center justify-center"><svg class="w-full h-full -rotate-90" viewBox="0 0 100 100"><circle class="text-slate-800" stroke-width="8" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50"/><circle id="result-ring-circle" class="text-sky-400" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" style="transition: stroke-dashoffset 1s cubic-bezier(0.22, 1, 0.36, 1), stroke 1s ease-in-out;"/></svg><div class="absolute flex flex-col items-center"><span id="riskPercentage" class="text-5xl font-bold text-white">0%</span><span id="riskLevel" class="text-lg font-medium text-slate-400">Low Risk</span></div></div></div><div class="mt-10"><h3 class="text-lg font-semibold mb-4 text-center text-white">Key Contributing Factors</h3><div id="factorsList" class="space-y-4"><p class="text-sm text-slate-400 text-center">Factor analysis is available in the full report from the Batch Analysis page.</p></div></div></div>
+                                <div id="loadingSpinner" class="hidden flex flex-col items-center justify-center py-10"><div class="loader"></div><p class="mt-6 text-slate-400">Contacting AI model...</p></div>
+                            </div></div>
+                        </div>
+                    </div>
+                </section>
+                
+                <!-- Batch Prediction Page (NEW) -->
+                <section id="batch" class="page">
+                    <div class="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                        <div class="glass-card p-8 md:p-12 text-center">
+                            <div class="card-glow"></div>
+                            <div class="content-wrapper">
+                                <h2 class="text-4xl font-bold tracking-tight text-white">Batch Risk Analysis</h2>
+                                <p class="mt-4 text-lg text-slate-300 max-w-2xl mx-auto">Upload a student dataset in CSV format to perform a risk analysis on the entire batch.</p>
+                                
+                                <div id="upload-area" class="mt-8">
+                                    <label for="file-upload" class="relative block w-full rounded-2xl border-2 border-dashed border-slate-600 p-12 text-center hover:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-900 cursor-pointer transition-colors">
+                                        <svg class="mx-auto h-12 w-12 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /></svg>
+                                        <span class="mt-2 block text-sm font-semibold text-white">Upload a file</span>
+                                        <span class="mt-1 block text-sm text-slate-400">or drag and drop CSV up to 10MB</span>
+                                    </label>
+                                    <input id="file-upload" name="file-upload" type="file" class="sr-only" accept=".csv">
+                                </div>
+
+                                <div id="processing-area" class="hidden mt-8 text-left">
+                                    <p class="text-lg font-medium text-white">File Ready for Analysis:</p>
+                                    <div class="mt-4 glass-card !rounded-xl p-4 flex items-center justify-between bg-slate-900/50">
+                                        <div class="flex items-center space-x-3 min-w-0">
+                                            <svg class="h-6 w-6 text-sky-400 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                                            <span id="file-name" class="text-sm font-medium text-slate-200 truncate">student_data_q3.csv</span>
+                                        </div>
+                                        <button id="cancel-upload" class="text-slate-400 hover:text-white text-2xl leading-none flex-shrink-0 ml-4">&times;</button>
+                                    </div>
+                                    <div class="mt-6">
+                                        <button id="predict-batch-btn" class="btn-primary w-full text-lg">Analyze Batch Data</button>
+                                    </div>
+                                </div>
+                                
+                                <div id="batch-loading" class="hidden mt-8">
+                                    <div class="loader mx-auto"></div>
+                                    <p class="mt-4 text-slate-300">Processing dataset... This may take a moment.</p>
+                                </div>
+
+                                <div id="batch-results-area" class="hidden mt-8 text-left">
+                                     <h3 class="text-2xl font-bold text-white text-center">Batch Analysis Complete</h3>
+                                     <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                                         <div class="glass-card !rounded-xl p-4 bg-slate-900/50"><p class="text-sm text-slate-400">Total Students</p><p id="batch-total" class="text-3xl font-bold text-white">0</p></div>
+                                         <div class="glass-card !rounded-xl p-4 bg-slate-900/50"><p class="text-sm text-slate-400">High-Risk Identified</p><p id="batch-high-risk" class="text-3xl font-bold text-red-500">0</p></div>
+                                         <div class="glass-card !rounded-xl p-4 bg-slate-900/50"><p class="text-sm text-slate-400">Avg. Risk Score</p><p id="batch-avg-risk" class="text-3xl font-bold text-amber-400">0%</p></div>
+                                     </div>
+                                     <div class="mt-8 text-center">
+                                         <button class="btn-primary">Download Full Report</button>
+                                     </div>
+                                      <div class="mt-4 text-center">
+                                        <button id="analyze-new-batch-btn" class="text-sky-400 text-sm hover:underline">Analyze another file</button>
+                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Dashboard Page -->
+                <section id="dashboard" class="page">
+                    <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                        <h2 class="text-4xl font-bold tracking-tight text-white mb-8">Analytics Dashboard</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            <div class="glass-card p-6 flex flex-col items-center justify-center text-center"><div class="card-glow"></div><div class="content-wrapper"><h3 class="text-lg font-semibold text-white">Overall Cohort Risk</h3><p id="dash-overall-risk" class="text-5xl font-extrabold text-amber-400 mt-2">Medium</p></div></div>
+                            <div class="glass-card p-6 flex flex-col items-center justify-center text-center"><div class="card-glow"></div><div class="content-wrapper"><h3 class="text-lg font-semibold text-white">Students at High Risk</h3><p id="dash-high-risk-perc" class="text-5xl font-extrabold text-red-500 mt-2">18%</p></div></div>
+                            <div class="glass-card p-6 flex flex-col items-center justify-center text-center"><div class="card-glow"></div><div class="content-wrapper"><h3 class="text-lg font-semibold text-white">Top Contributing Factor</h3><p id="dash-top-factor" class="text-2xl font-bold text-sky-400 mt-2">Low Attendance</p></div></div>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+                            <div class="glass-card p-6"><div class="card-glow"></div><div class="content-wrapper"><h3 class="text-xl font-semibold mb-4 text-white">Risk Distribution</h3><canvas id="riskDistributionChart"></canvas></div></div>
+                            <div class="glass-card p-6"><div class="card-glow"></div><div class="content-wrapper"><h3 class="text-xl font-semibold mb-4 text-white">Factor Importance</h3><canvas id="factorImportanceChart"></canvas></div></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- About Page -->
+                <section id="about" class="page">
+                    <div class="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                        <div class="glass-card p-8 md:p-12 text-center"><div class="card-glow"></div><div class="content-wrapper">
+                            <h2 class="text-4xl font-bold tracking-tight text-white">Project Methodology</h2>
+                            <p class="mt-4 text-lg text-slate-300 max-w-2xl mx-auto">Aura is the culmination of our B.Tech Engineering Design Project, focusing on the application of Educational Data Mining for student success.</p>
+                            <div class="mt-8 border-t border-white/10 pt-8 text-left">
+                                <h3 class="text-2xl font-semibold text-sky-400 text-center">Core Technologies</h3>
+                                <p class="mt-2 text-slate-300 text-center max-w-2xl mx-auto">Our predictive engine is built on a foundation of robust, industry-standard machine learning techniques to ensure the highest degree of accuracy.</p>
+                                <ul class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <li class="glass-card p-6 !rounded-2xl"><div class="card-glow"></div><div class="content-wrapper"><strong class="text-white text-lg">Ensemble Learning</strong><p class="text-slate-400 text-sm mt-1">Combining multiple models (Bagging & Boosting) to create a more powerful and stable meta-model.</p></div></li>
+                                    <li class="glass-card p-6 !rounded-2xl"><div class="card-glow"></div><div class="content-wrapper"><strong class="text-white text-lg">Gradient Boosting</strong><p class="text-slate-400 text-sm mt-1">Building models sequentially, where each corrects its predecessor's errors, for highly accurate predictions.</p></div></li>
+                                    <li class="glass-card p-6 !rounded-2xl"><div class="card-glow"></div><div class="content-wrapper"><strong class="text-white text-lg">Random Forest</strong><p class="text-slate-400 text-sm mt-1">Using a multitude of decision trees to prevent overfitting and enhance accuracy.</p></div></li>
+                                </ul>
+                            </div>
+                        </div></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        
+        // --- CONFIGURATION ---
+        const API_BASE_URL = 'http://127.0.0.1:5000';
+
+        // --- 3D GALAXY BACKGROUND ---
+        let scene, camera, renderer, galaxy;
+        const mouse = new THREE.Vector2();
+        
+        function init3DBackground() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 2;
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            const parameters = {count: 20000, size: 0.02, radius: 5, branches: 5, spin: 1, randomness: 0.5, randomnessPower: 3, insideColor: '#818cf8', outsideColor: '#38bdf8' };
+            const positions = new Float32Array(parameters.count * 3);
+            const colors = new Float32Array(parameters.count * 3);
+            const colorInside = new THREE.Color(parameters.insideColor);
+            const colorOutside = new THREE.Color(parameters.outsideColor);
+
+            for(let i = 0; i < parameters.count; i++) {
+                const i3 = i * 3;
+                const radius = Math.random() * parameters.radius;
+                const spinAngle = radius * parameters.spin;
+                const branchAngle = (i % parameters.branches) / parameters.branches * Math.PI * 2;
+                const randomX = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * parameters.randomness * radius;
+                const randomY = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * parameters.randomness * radius;
+                const randomZ = Math.pow(Math.random(), parameters.randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * parameters.randomness * radius;
+                positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+                positions[i3 + 1] = randomY;
+                positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+                const mixedColor = colorInside.clone().lerp(colorOutside, radius / parameters.radius);
+                colors[i3] = mixedColor.r;
+                colors[i3 + 1] = mixedColor.g;
+                colors[i3 + 2] = mixedColor.b;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({ size: parameters.size, sizeAttenuation: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexColors: true });
+            galaxy = new THREE.Points(geometry, material);
+            scene.add(galaxy);
+            
+            window.addEventListener('resize', onWindowResize);
+            document.querySelector('.main-wrapper').addEventListener('mousemove', onMouseMove);
+            animate();
+        }
+
+        const clock = new THREE.Clock();
+        function animate() {
+            galaxy.rotation.y = clock.getElapsedTime() * 0.1;
+            camera.position.x += (mouse.x * 0.5 - camera.position.x) * 0.05;
+            camera.position.y += (-mouse.y * 0.5 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+        function onMouseMove(event) { const rect = renderer.domElement.getBoundingClientRect(); mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1; mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1; }
+        init3DBackground();
+        
+        // --- AUTHENTICATION & APP FLOW ---
+        const authContainer = document.getElementById('auth-container');
+        const appContent = document.getElementById('app-content');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const logoutBtn = document.getElementById('logout-btn');
+        const preloader = document.getElementById('preloader');
+        let currentPage = appContent.querySelector('.page.active');
+        let isTransitioning = false;
+
+        function showApp() { authContainer.classList.add('hidden'); appContent.classList.remove('hidden'); showPage('home'); }
+        function showAuth() { appContent.classList.add('hidden'); authContainer.classList.remove('hidden'); authContainer.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById('login').classList.add('active'); }
+        loginForm.addEventListener('submit', (e) => { e.preventDefault(); showApp(); });
+        registerForm.addEventListener('submit', (e) => { e.preventDefault(); showApp(); });
+        logoutBtn.addEventListener('click', (e) => { e.preventDefault(); showAuth(); });
+
+        // --- PAGE NAVIGATION ---
+        async function showPage(pageId) {
+            const newPage = appContent.querySelector(`#${pageId}`);
+            if (!newPage || newPage === currentPage || isTransitioning) return;
+            isTransitioning = true;
+            preloader.classList.add('show');
+
+            setTimeout(async () => {
+                if (currentPage) currentPage.classList.remove('active');
+                newPage.classList.add('active');
+                currentPage = newPage;
+                
+                appContent.querySelectorAll('.nav-link').forEach(link => { link.classList.toggle('active', link.hash === `#${pageId}`); });
+                
+                if (pageId === 'dashboard') {
+                    await loadDashboardData(); // Load real data for the dashboard
+                }
+
+                preloader.classList.remove('show');
+                setTimeout(() => { isTransitioning = false; }, 500);
+            }, 1000);
+        }
+
+        appContent.querySelectorAll('.nav-link').forEach(link => { if(!link.id.includes('logout')) { link.addEventListener('click', (e) => { e.preventDefault(); showPage(link.hash.substring(1)); }); } });
+        const showRegisterLink = document.getElementById('show-register');
+        const showLoginLink = document.getElementById('show-login');
+        showRegisterLink.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('login-form-container').classList.add('hidden'); document.getElementById('register-form-container').classList.remove('hidden'); });
+        showLoginLink.addEventListener('click', (e) => { e.preventDefault(); document.getElementById('register-form-container').classList.add('hidden'); document.getElementById('login-form-container').classList.remove('hidden'); });
+        
+        // --- BATCH PREDICTION PAGE LOGIC ---
+        const fileInput = document.getElementById('file-upload');
+        const predictBatchBtn = document.getElementById('predict-batch-btn');
+        const analyzeNewBtn = document.getElementById('analyze-new-batch-btn');
+
+        function resetBatchPage() {
+            fileInput.value = '';
+            document.getElementById('upload-area').classList.remove('hidden');
+            document.getElementById('processing-area').classList.add('hidden');
+            document.getElementById('batch-loading').classList.add('hidden');
+            document.getElementById('batch-results-area').classList.add('hidden');
+        }
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('file-name').textContent = file.name;
+                document.getElementById('upload-area').classList.add('hidden');
+                document.getElementById('processing-area').classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('cancel-upload').addEventListener('click', resetBatchPage);
+        analyzeNewBtn.addEventListener('click', resetBatchPage);
+
+        predictBatchBtn.addEventListener('click', async () => {
+            document.getElementById('processing-area').classList.add('hidden');
+            document.getElementById('batch-loading').classList.remove('hidden');
+
+            // --- CORRECTED API CALL FOR BATCH PREDICTION WITH FILE UPLOAD ---
+            const file = fileInput.files[0]; // Get the selected file
+            if (!file) {
+                alert('Please select a file first.');
+                resetBatchPage();
+                return;
+            }
+
+            const formData = new FormData(); // Create FormData object
+            formData.append('file', file); // Append the file with the key 'file' (matching backend)
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/batch-predict`, {
+                    method: 'POST',
+                    body: formData, // Send FormData, not JSON
+                    // IMPORTANT: Do NOT set Content-Type header manually for FormData
+                    // The browser will set it correctly with the boundary
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('batch-total').textContent = data.total_students.toLocaleString();
+                    document.getElementById('batch-high-risk').textContent = data.high_risk_count.toLocaleString();
+                    document.getElementById('batch-avg-risk').textContent = `${Math.round(data.average_risk_score * 100)}%`;
+                    document.getElementById('batch-loading').classList.add('hidden');
+                    document.getElementById('batch-results-area').classList.remove('hidden');
+                } else {
+                    // Display the specific error message from the backend
+                    throw new Error(data.error || 'Failed to analyze batch. Check file format?');
+                }
+            } catch (error) {
+                console.error("Batch prediction error:", error);
+                alert(`Error: ${error.message}`);
+                resetBatchPage(); // Reset the UI on error
+            }
+        });
+
+        // --- SINGLE PREDICTION FORM LOGIC (NOW WITH API CALL) ---
+        document.getElementById('predictionForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            document.getElementById('resultPlaceholder').classList.add('hidden');
+            document.getElementById('resultOutput').classList.add('hidden');
+            document.getElementById('loadingSpinner').classList.remove('hidden');
+
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData.entries());
+
+            // --- API CALL FOR SINGLE PREDICTION ---
+            try {
+                const response = await fetch(`${API_BASE_URL}/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                
+                const result = await response.json();
+
+                if (response.ok) {
+                    const probability = result.risk_probability * 100;
+                    updatePredictionUI(result.risk_level, probability);
+                } else {
+                    throw new Error(result.error || 'Prediction failed.');
+                }
+
+            } catch (error) {
+                console.error("Prediction error:", error);
+                alert(`Error communicating with the model: ${error.message}`);
+                document.getElementById('resultPlaceholder').classList.remove('hidden');
+            } finally {
+                document.getElementById('loadingSpinner').classList.add('hidden');
+                document.getElementById('resultOutput').classList.remove('hidden');
+            }
+        });
+
+        function updatePredictionUI(riskLevel, probability) {
+            let riskColor;
+            if (riskLevel === 'High Risk') riskColor = '#f43f5e';
+            else if (riskLevel === 'Medium Risk') riskColor = '#facc15';
+            else riskColor = '#38bdf8';
+            
+            const ring = document.getElementById('result-ring-circle');
+            const radius = ring.r.baseVal.value; const circumference = 2 * Math.PI * radius;
+            ring.style.strokeDasharray = `${circumference} ${circumference}`; ring.style.strokeDashoffset = circumference;
+            setTimeout(() => { const offset = circumference - (probability / 100) * circumference; ring.style.strokeDashoffset = offset; ring.style.stroke = riskColor; }, 100);
+            const percentageEl = document.getElementById('riskPercentage'); let currentPercent = 0;
+            const interval = setInterval(() => { currentPercent += 1.5; if (currentPercent >= probability) { currentPercent = probability; clearInterval(interval); } percentageEl.textContent = `${Math.floor(currentPercent)}%`; }, 15);
+            document.getElementById('riskLevel').textContent = riskLevel;
+        }
+        
+        // --- DASHBOARD CHARTS LOGIC (NOW WITH API CALL) ---
+        let riskDistributionChart = null;
+        let factorImportanceChart = null;
+
+        async function loadDashboardData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/dashboard`);
+                const data = await response.json();
+                if(response.ok) {
+                    renderDashboardCharts(data);
+                    document.getElementById('dash-overall-risk').textContent = data.summary_stats.overall_risk;
+                    document.getElementById('dash-high-risk-perc').textContent = `${data.summary_stats.high_risk_percentage}%`;
+                    document.getElementById('dash-top-factor').textContent = data.summary_stats.top_factor;
+                } else {
+                    throw new Error(data.error || 'Failed to load dashboard data');
+                }
+            } catch (error) {
+                console.error("Dashboard error:", error);
+                alert(`Could not load dashboard data: ${error.message}`);
+            }
+        }
+        
+        function renderDashboardCharts(apiData) {
+            if (riskDistributionChart) riskDistributionChart.destroy();
+            if (factorImportanceChart) factorImportanceChart.destroy();
+            
+            Chart.defaults.color = '#94a3b8'; Chart.defaults.borderColor = 'rgba(51, 65, 85, 0.4)';
+            
+            riskDistributionChart = new Chart(document.getElementById('riskDistributionChart'), { type: 'doughnut', data: { labels: ['Low Risk', 'Medium Risk', 'High Risk'], datasets: [{ data: apiData.risk_distribution, backgroundColor: ['#38bdf8', '#facc15', '#f43f5e'], borderWidth: 0 }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { padding: 20 } } } } });
+            factorImportanceChart = new Chart(document.getElementById('factorImportanceChart'), { type: 'bar', data: { labels: apiData.factor_importance.labels, datasets: [{ data: apiData.factor_importance.scores, backgroundColor: 'rgba(56, 189, 248, 0.6)', borderColor: '#38bdf8', borderWidth: 1 }] }, options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(51, 65, 85, 0.2)' } }, y: { grid: { display: false } } } } });
+        }
+
+        // --- MOUSE GLOW EFFECT FOR CARDS ---
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mousemove', e => { const rect = card.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top; card.style.setProperty('--mouse-x', `${x}px`); card.style.setProperty('--mouse-y', `${y}px`); });
+        });
+    </script>
+</body>
+</html>
+
